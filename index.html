@@ -219,18 +219,26 @@ difference() {
     });
 
     // Avvio OpenSCAD WASM
+    // Sostituisci la vecchia funzione init() con questa:
     async function init() {
         try {
-            openScadInstance = await OpenSCAD({ noInitialRun: true });
+            // Diciamo a WebAssembly di cercare il file .wasm esattamente su unpkg
+            openScadInstance = await OpenSCAD({ 
+                noInitialRun: true,
+                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
+            });
+            
             statusElem.className = "success";
             statusElem.innerText = "Pronto! Inserisci il codice e converti.";
             convertBtn.innerText = "Genera e Scarica STL";
             convertBtn.disabled = false;
         } catch (e) {
+            console.error(e);
             statusElem.className = "error";
             statusElem.innerText = "Errore nel caricamento del motore 3D.";
         }
     }
+
 
     // Funzione di conversione
     async function convert() {
