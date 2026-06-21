@@ -6,153 +6,18 @@
     <title>OpenSCAD to STL Studio</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
-    
     <style>
-        :root {
-            --bg-main: #0f172a;
-            --bg-card: #1e293b;
-            --bg-input: #0b0f19;
-            --accent: #10b981;
-            --accent-hover: #059669;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border: #334155;
-        }
-
+        :root { --bg-main: #0f172a; --bg-card: #1e293b; --bg-input: #0b0f19; --accent: #10b981; --accent-hover: #059669; --text-main: #f8fafc; --text-muted: #94a3b8; --border: #334155; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 650px;
-            width: 100%;
-            margin: auto;
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border);
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        header h1 {
-            font-size: 1.5rem;
-            color: var(--text-main);
-            font-weight: 700;
-            letter-spacing: -0.025em;
-            margin-bottom: 4px;
-        }
-
-        header p {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .editor-zone {
-            margin-bottom: 20px;
-        }
-
-        .label-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        textarea {
-            width: 100%;
-            height: 250px;
-            background-color: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 14px;
-            color: #38bdf8; /* Colore codice stile cyber */
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            resize: none;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        textarea:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-        }
-
-        .file-upload {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-input);
-            border: 2px dashed var(--border);
-            border-radius: 10px;
-            padding: 12px;
-            text-align: center;
-            margin-bottom: 20px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
-        .file-upload input[type="file"] {
-            position: absolute;
-            left: 0; top: 0; opacity: 0;
-            width: 100%; height: 100%;
-            cursor: pointer;
-        }
-
-        button {
-            width: 100%;
-            background-color: var(--accent);
-            color: #042f1a;
-            border: none;
-            padding: 15px;
-            font-size: 1rem;
-            font-weight: 700;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
-        }
-
-        button:hover {
-            background-color: var(--accent-hover);
-        }
-
-        button:disabled {
-            background-color: var(--border);
-            color: var(--text-muted);
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        #status {
-            margin-top: 15px;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            text-align: center;
-            background: #0b132b;
-            border: 1px solid #1c2541;
-            color: #5bc0be;
-        }
-
+        body { font-family: system-ui, sans-serif; background-color: var(--bg-main); color: var(--text-main); padding: 15px; display: flex; flex-direction: column; min-height: 100vh; }
+        .container { max-width: 650px; width: 100%; margin: auto; background: var(--bg-card); border-radius: 16px; padding: 24px; border: 1px solid var(--border); }
+        header { text-align: center; margin-bottom: 20px; }
+        header h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        header p { font-size: 0.85rem; color: var(--text-muted); }
+        textarea { width: 100%; height: 200px; background-color: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 14px; color: #38bdf8; font-family: monospace; font-size: 0.95rem; resize: none; outline: none; margin-top: 8px; }
+        button { width: 100%; background-color: var(--accent); color: #042f1a; border: none; padding: 15px; font-size: 1rem; font-weight: 700; border-radius: 10px; cursor: pointer; margin-top: 15px; }
+        button:disabled { background-color: var(--border); color: var(--text-muted); }
+        #status { margin-top: 15px; padding: 12px; border-radius: 8px; font-size: 0.85rem; text-align: center; background: #0b132b; color: #5bc0be; word-break: break-all; }
         .error { background: #451a1a !important; color: #fca5a5 !important; border-color: #7f1d1d !important; }
         .success { background: #064e3b !important; color: #a7f3d0 !important; border-color: #065f46 !important; }
     </style>
@@ -162,67 +27,34 @@
 <div class="container">
     <header>
         <h1>OpenSCAD ➔ STL Converter</h1>
-        <p>Rendering 3D ultra-veloce locale e offline</p>
+        <p>Rendering 3D locale e offline</p>
     </header>
 
-    <div class="editor-zone">
-        <div class="label-row">
-            <span>Codice OpenSCAD:</span>
-            <span id="clearBtn" style="cursor:pointer; color:var(--accent)">Cancella</span>
-        </div>
-        <textarea id="scadCode" placeholder="Scrivi qui il tuo codice OpenSCAD...">// Esempio di un cilindro forato
+    <textarea id="scadCode">// Esempio cilindro forato
 difference() {
-    cylinder(h=20, r=15, center=true, $fn=100);
-    cylinder(h=22, r=8, center=true, $fn=100);
+    cylinder(h=20, r=15, center=true, $fn=50);
+    cylinder(h=22, r=8, center=true, $fn=50);
 }</textarea>
-    </div>
 
-    <div class="file-upload">
-        <span id="fileLabel">📁 Oppure trascina/carica un file .scad</span>
-        <input type="file" id="fileInput" accept=".scad">
-    </div>
-
-    <button id="convertBtn" disabled>Inizializzazione motore...</button>
-    <div id="status">Scaricamento librerie geometriche...</div>
+    <button id="convertBtn" disabled>Inizializzazione...</button>
+    <div id="status">Avvio download del motore geometrico...</div>
 </div>
 
 <script type="module">
     import OpenSCAD from "https://unpkg.com/openscad-wasm@0.0.4/openscad.js";
 
     const scadCodeElem = document.getElementById('scadCode');
-    const fileInputElem = document.getElementById('fileInput');
-    const fileLabel = document.getElementById('fileLabel');
     const convertBtn = document.getElementById('convertBtn');
     const statusElem = document.getElementById('status');
-    const clearBtn = document.getElementById('clearBtn');
 
-    let openScadInstance = null;
-
-    // Registrazione del Service Worker per l'uso Offline PWA
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(() => console.log("Service Worker Attivo"))
-            .catch(err => console.log("Errore SW:", err));
+        navigator.serviceWorker.register('sw.js').catch(err => console.log("SW Error:", err));
     }
 
-    // Svuota editor
-    clearBtn.addEventListener('click', () => { scadCodeElem.value = ''; });
-
-    // Caricamento file esterno
-    fileInputElem.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        fileLabel.innerText = `📄 ${file.name}`;
-        const reader = new FileReader();
-        reader.onload = (evt) => { scadCodeElem.value = evt.target.result; };
-        reader.readAsText(file);
-    });
-
-    // Avvio OpenSCAD WASM
-    // Sostituisci la vecchia funzione init() con questa:
     async function init() {
         try {
-            // Diciamo a WebAssembly di cercare il file .wasm esattamente su unpkg
+            statusElem.innerText = "Download completato. Compilazione WebAssembly in corso...";
+            
             openScadInstance = await OpenSCAD({ 
                 noInitialRun: true,
                 locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
@@ -233,50 +65,47 @@ difference() {
             convertBtn.innerText = "Genera e Scarica STL";
             convertBtn.disabled = false;
         } catch (e) {
-            console.error(e);
+            // Se fallisce, sputa l'errore preciso sullo schermo
             statusElem.className = "error";
-            statusElem.innerText = "Errore nel caricamento del motore 3D.";
+            statusElem.innerText = "ERRORE DI AVVIO: " + e.message + " | " + e.toString();
         }
     }
 
+    let openScadInstance = null;
+    
+    // Gestione errori globali dello script
+    window.addEventListener('error', function(e) {
+        statusElem.className = "error";
+        statusElem.innerText = "ERRORE SCRIPT: " + e.message;
+    });
 
-    // Funzione di conversione
-    async function convert() {
+    convertBtn.addEventListener('click', async () => {
         const code = scadCodeElem.value.trim();
-        if(!code) return alert("L'editor è vuoto!");
-
+        if(!code) return;
         convertBtn.disabled = true;
         statusElem.className = "";
-        statusElem.innerText = "Calcolo matematico dei solidi in corso...";
-        
-        await new Promise(r => setTimeout(r, 100));
-
+        statusElem.innerText = "Elaborazione solido 3D...";
+        await new Promise(r => setTimeout(r, 50));
         try {
             openScadInstance.FS.writeFile("/input.scad", code);
-            // Abilitiamo il motore "manifold" per performance istantanee su mobile
             openScadInstance.callMain(["/input.scad", "--enable=manifold", "-o", "/output.stl"]);
-            
             const outputData = openScadInstance.FS.readFile("/output.stl");
             const blob = new Blob([outputData], { type: "application/sla" });
             const url = URL.createObjectURL(blob);
-            
             const a = document.createElement("a");
             a.href = url;
             a.download = "modello_3d.stl";
             a.click();
-            URL.revokeObjectURL(url);
-
             statusElem.className = "success";
-            statusElem.innerText = "STL generato e scaricato con successo!";
+            statusElem.innerText = "STL scaricato!";
         } catch (err) {
             statusElem.className = "error";
-            statusElem.innerText = "Errore di compilazione. Controlla la sintassi del codice.";
+            statusElem.innerText = "Errore di compilazione del codice OpenSCAD.";
         } finally {
             convertBtn.disabled = false;
         }
-    }
+    });
 
-    convertBtn.addEventListener('click', convert);
     init();
 </script>
 
