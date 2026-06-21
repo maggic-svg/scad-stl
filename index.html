@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenSCAD to STL Studio</title>
+    <title>OpenSCAD3 ➔ STL Converter</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <style>
@@ -63,6 +63,7 @@ difference() {
     }
 
     let openScadInstance = null;
+    let emscriptenModuleConfig = {};
 
     async function init() {
         try {
@@ -85,14 +86,29 @@ difference() {
             }
 
             if (!openScadFactory) {
-                throw new Error("Nessuna funzione esportata.");
+                throw new Error("Nessuna funzione esportata nel file WASM.");
             }
 
-            // Inizializzazione del motore geometrico
-            openScadInstance = await openScadFactory({ 
+            statusElem.innerText = "Inizializzazione macchina virtuale WASM...";
+
+            // Oggetto di configurazione che memorizzerà lo stato interno di Emscripten
+            emscriptenModuleConfig = { 
                 noInitialRun: true,
                 locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
-            });
+            };
+
+            // Lanciamo l'inizializzazione del modulo geometrico
+            const result = await openScadFactory(emscriptenModuleConfig);
+            openScadInstance = result || emscriptenModuleConfig;
+
+            // TRUCCO: Se l'ambiente usa il vecchio sistema a promessa ritardata, attendiamo il caricamento totale
+            if (openScadInstance.ready && typeof openScadInstance.ready.then === 'function') {
+                statusElem.innerText = "Configurazione del File System virtuale...";
+                await openScadInstance.ready;
+            }
+            if (emscriptenModuleConfig.ready && typeof emscriptenModuleConfig.ready.then === 'function') {
+                await emscriptenModuleConfig.ready;
+            }
             
             statusElem.className = "success";
             statusElem.innerText = "Pronto! Inserisci il codice e converti.";
@@ -113,15 +129,31 @@ difference() {
         await new Promise(r => setTimeout(r, 50));
         
         try {
-            // Scriviamo il file nella memoria virtuale interna
-            openScadInstance.FS.writeFile("input.scad", code);
+            // Recupero incrociato del File System (FS) e della funzione principale (callMain)
+            const FS = openScadInstance.FS || openScadInstance.fs || emscriptenModuleConfig.FS || emscriptenModuleConfig.fs;
+            const callMain = openScadInstance.callMain || emscriptenModuleConfig.callMain;
+
+            // Se non lo trova nemmeno così, estrae la lista delle chiavi per l'autodiagnosi istantanea
+            if (!FS || typeof FS.writeFile !== 'function') {
+                const instKeys = Object.keys(openScadInstance).join(', ') || 'vuoto';
+                const confKeys = Object.keys(emscriptenModuleConfig).join(', ') || 'vuoto';
+                throw new Error("FS non mappato. Elementi Istanza: [" + instKeys + "] | Elementi Config: [" + confKeys + "]");
+            }
+
+            // Scrittura del codice OpenSCAD nella sandbox del browser
+            FS.writeFile("input.scad", code);
             
-            // Eseguiamo il core OpenSCAD (Rimosso flag Manifold che potrebbe mandare in crash la versione 0.0.4)
-            openScadInstance.callMain(["input.scad", "-o", "output.stl"]);
+            // Esecuzione del compilatore geometrico
+            if (typeof callMain === 'function') {
+                callMain(["input.scad", "-o", "output.stl"]);
+            } else if (typeof openScadInstance === 'function') {
+                openScadInstance(["input.scad", "-o", "output.stl"]);
+            } else {
+                throw new Error("Funzione di compilazione (callMain) mancante.");
+            }
             
-            // Leggiamo il risultato generato
-            const outputData = openScadInstance.FS.readFile("output.stl");
-            
+            // Lettura del binario STL generato e download automatico
+            const outputData = FS.readFile("output.stl");
             const blob = new Blob([outputData], { type: "application/sla" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -132,58 +164,6 @@ difference() {
             statusElem.className = "success";
             statusElem.innerText = "STL scaricato con successo!";
         } catch (err) {
-            // SPIA DETTAGLIATA: Spiega esattamente cosa è andato storto nel motore geometrico
-            statusElem.className = "error";
-            statusElem.innerText = "CRASH COMPILATORE: " + (err.message || err.toString());
-        } finally {
-            convertBtn.disabled = false;
-        }
-    });
-
-    init();
-</script>
-
-</body>
-</html>
-            statusElem.className = "success";
-            statusElem.innerText = "Pronto! Inserisci il codice e converti.";
-            convertBtn.innerText = "Genera e Scarica STL";
-            convertBtn.disabled = false;
-        } catch (e) {
-            statusElem.className = "error";
-            statusElem.innerText = "ERRORE AVVIO: " + e.message;
-        }
-    }
-
-    convertBtn.addEventListener('click', async () => {
-        const code = scadCodeElem.value.trim();
-        if(!code) return;
-        convertBtn.disabled = true;
-        statusElem.className = "";
-        statusElem.innerText = "Elaborazione solido 3D...";
-        await new Promise(r => setTimeout(r, 50));
-        
-        try {
-            // Scriviamo il file nella memoria virtuale interna
-            openScadInstance.FS.writeFile("input.scad", code);
-            
-            // Eseguiamo il core OpenSCAD (Rimosso flag Manifold che potrebbe mandare in crash la versione 0.0.4)
-            openScadInstance.callMain(["input.scad", "-o", "output.stl"]);
-            
-            // Leggiamo il risultato generato
-            const outputData = openScadInstance.FS.readFile("output.stl");
-            
-            const blob = new Blob([outputData], { type: "application/sla" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "modello_3d.stl";
-            a.click();
-            
-            statusElem.className = "success";
-            statusElem.innerText = "STL scaricato con successo!";
-        } catch (err) {
-            // SPIA DETTAGLIATA: Spiega esattamente cosa è andato storto nel motore geometrico
             statusElem.className = "error";
             statusElem.innerText = "CRASH COMPILATORE: " + (err.message || err.toString());
         } finally {
