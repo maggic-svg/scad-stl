@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenSCAD2 to STL Studio</title>
+    <title>OpenSCAD to STL Studio</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <style>
@@ -52,7 +52,6 @@ difference() {
 </script>
 
 <script type="module">
-    // Importiamo l'intero pacchetto come oggetto globale temporaneo
     import * as OScadModule from "https://unpkg.com/openscad-wasm@0.0.4/openscad.js";
 
     const scadCodeElem = document.getElementById('scadCode');
@@ -67,12 +66,9 @@ difference() {
 
     async function init() {
         try {
-            statusElem.innerText = "Scansione delle funzioni esportate...";
-            
             let openScadFactory = null;
             const keys = Object.keys(OScadModule);
 
-            // 1. Controllo i nomi più probabili
             if (typeof OScadModule.OpenSCAD === 'function') {
                 openScadFactory = OScadModule.OpenSCAD;
             } else if (typeof OScadModule.openscad === 'function') {
@@ -80,7 +76,6 @@ difference() {
             } else if (typeof OScadModule.default === 'function') {
                 openScadFactory = OScadModule.default;
             } else {
-                // 2. Fallback dinamico: estrai la prima cosa che sia una funzione
                 for (let key of keys) {
                     if (typeof OScadModule[key] === 'function') {
                         openScadFactory = OScadModule[key];
@@ -89,12 +84,9 @@ difference() {
                 }
             }
 
-            // Se fallisce la ricerca automatica, sputa fuori le chiavi trovate per l'ispezione
             if (!openScadFactory) {
-                throw new Error("Nessuna funzione esportata. Elementi trovati nel file: [" + keys.join(', ') + "]");
+                throw new Error("Nessuna funzione esportata.");
             }
-
-            statusElem.innerText = "Funzione trovata! Compilazione WebAssembly...";
 
             // Inizializzazione del motore geometrico
             openScadInstance = await openScadFactory({ 
@@ -119,27 +111,35 @@ difference() {
         statusElem.className = "";
         statusElem.innerText = "Elaborazione solido 3D...";
         await new Promise(r => setTimeout(r, 50));
+        
         try {
-            openScadInstance.FS.writeFile("/input.scad", code);
-            openScadInstance.callMain(["/input.scad", "--enable=manifold", "-o", "/output.stl"]);
-            const outputData = openScadInstance.FS.readFile("/output.stl");
+            // Scriviamo il file nella memoria virtuale interna
+            openScadInstance.FS.writeFile("input.scad", code);
+            
+            // Eseguiamo il core OpenSCAD (Rimosso flag Manifold che potrebbe mandare in crash la versione 0.0.4)
+            openScadInstance.callMain(["input.scad", "-o", "output.stl"]);
+            
+            // Leggiamo il risultato generato
+            const outputData = openScadInstance.FS.readFile("output.stl");
+            
             const blob = new Blob([outputData], { type: "application/sla" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
             a.download = "modello_3d.stl";
             a.click();
+            
             statusElem.className = "success";
             statusElem.innerText = "STL scaricato con successo!";
         } catch (err) {
+            // SPIA DETTAGLIATA: Spiega esattamente cosa è andato storto nel motore geometrico
             statusElem.className = "error";
-            statusElem.innerText = "Errore di compilazione del codice OpenSCAD.";
+            statusElem.innerText = "CRASH COMPILATORE: " + (err.message || err.toString());
         } finally {
             convertBtn.disabled = false;
         }
     });
 
-    // Avvia quando la pagina ha caricato tutto il modulo
     init();
 </script>
 
