@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -40,6 +41,24 @@ difference() {
     <div id="status">Avvio download del motore geometrico...</div>
 </div>
 
+<script>
+    window.onerror = function(message, source, lineno, colno, error) {
+        const status = document.getElementById('status');
+        if(status) {
+            status.className = "error";
+            status.innerText = "BLOCCO BROWSER: " + message + " (Linea: " + lineno + ")";
+        }
+        return false;
+    };
+    window.onunhandledrejection = function(event) {
+        const status = document.getElementById('status');
+        if(status) {
+            status.className = "error";
+            status.innerText = "PROMESSA BLOCCATA: " + event.reason;
+        }
+    };
+</script>
+
 <script type="module">
     import OpenSCAD from "https://unpkg.com/openscad-wasm@0.0.4/openscad.js";
 
@@ -53,7 +72,7 @@ difference() {
 
     async function init() {
         try {
-            statusElem.innerText = "Download completato. Compilazione WebAssembly in corso...";
+            statusElem.innerText = "Download completato. Compilazione WebAssembly...";
             
             openScadInstance = await OpenSCAD({ 
                 noInitialRun: true,
@@ -65,19 +84,12 @@ difference() {
             convertBtn.innerText = "Genera e Scarica STL";
             convertBtn.disabled = false;
         } catch (e) {
-            // Se fallisce, sputa l'errore preciso sullo schermo
             statusElem.className = "error";
-            statusElem.innerText = "ERRORE DI AVVIO: " + e.message + " | " + e.toString();
+            statusElem.innerText = "ERRORE APPLICAZIONE: " + e.message;
         }
     }
 
     let openScadInstance = null;
-    
-    // Gestione errori globali dello script
-    window.addEventListener('error', function(e) {
-        statusElem.className = "error";
-        statusElem.innerText = "ERRORE SCRIPT: " + e.message;
-    });
 
     convertBtn.addEventListener('click', async () => {
         const code = scadCodeElem.value.trim();
