@@ -1,4 +1,4 @@
-const CACHE_NAME = 'scad-compiler-v2';
+const CACHE_NAME = 'scad-compiler-v3';
 const ASSETS = [
   'index.html',
   'manifest.json',
