@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cik OpenSCAD to STL Studio</title>
+    <title>New OpenSCAD to STL Studio</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <style>
@@ -22,6 +21,8 @@
         .error { background: #451a1a !important; color: #fca5a5 !important; border-color: #7f1d1d !important; }
         .success { background: #064e3b !important; color: #a7f3d0 !important; border-color: #065f46 !important; }
     </style>
+
+    <script src="https://unpkg.com/openscad-wasm@0.0.4/openscad.js"></script>
 </head>
 <body>
 
@@ -50,18 +51,9 @@ difference() {
         }
         return false;
     };
-    window.onunhandledrejection = function(event) {
-        const status = document.getElementById('status');
-        if(status) {
-            status.className = "error";
-            status.innerText = "PROMESSA BLOCCATA: " + event.reason;
-        }
-    };
 </script>
 
-<script type="module">
-    import OpenSCAD from "https://unpkg.com/openscad-wasm@0.0.4/openscad.js";
-
+<script>
     const scadCodeElem = document.getElementById('scadCode');
     const convertBtn = document.getElementById('convertBtn');
     const statusElem = document.getElementById('status');
@@ -70,11 +62,18 @@ difference() {
         navigator.serviceWorker.register('sw.js').catch(err => console.log("SW Error:", err));
     }
 
+    let openScadInstance = null;
+
     async function init() {
         try {
-            statusElem.innerText = "Download completato. Compilazione WebAssembly...";
+            statusElem.innerText = "Compilazione WebAssembly in corso...";
             
-            openScadInstance = await OpenSCAD({ 
+            // Usiamo la funzione caricata globalmente nella Window
+            if (typeof window.OpenSCAD !== 'function') {
+                throw new Error("Il motore OpenSCAD non è stato caricato dalla rete.");
+            }
+
+            openScadInstance = await window.OpenSCAD({ 
                 noInitialRun: true,
                 locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
             });
@@ -88,8 +87,6 @@ difference() {
             statusElem.innerText = "ERRORE APPLICAZIONE: " + e.message;
         }
     }
-
-    let openScadInstance = null;
 
     convertBtn.addEventListener('click', async () => {
         const code = scadCodeElem.value.trim();
@@ -118,7 +115,8 @@ difference() {
         }
     });
 
-    init();
+    // Avvia l'inizializzazione al caricamento della pagina
+    window.addEventListener('load', init);
 </script>
 
 </body>
