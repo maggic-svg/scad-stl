@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenSCAD3 ➔ STL Converter</title>
+    <title>OpenSCAD4 ➔ STL Converter</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <style>
@@ -63,6 +63,7 @@ difference() {
     }
 
     let openScadInstance = null;
+    let openScadLogs = []; // Array per catturare i messaggi reali di OpenSCAD
 
     async function init() {
         try {
@@ -90,9 +91,11 @@ difference() {
 
             statusElem.innerText = "Compilazione motore grafico...";
 
-            // Lanciamo il factory passandogli i parametri richiesti
+            // Intercettiamo print e printErr di Emscripten per salvare i log reali di OpenSCAD
             openScadInstance = await openScadFactory({ 
                 noInitialRun: true,
+                print: (text) => {  openScadLogs.push(text); },
+                printErr: (text) => { openScadLogs.push(text); },
                 locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
             });
             
@@ -112,23 +115,20 @@ difference() {
         convertBtn.disabled = true;
         statusElem.className = "";
         statusElem.innerText = "Elaborazione solido 3D in corso...";
+        openScadLogs = []; // Svuota i log del vecchio tentativo
         await new Promise(r => setTimeout(r, 50));
         
         try {
-            // Verifichiamo che la funzione nativa estratta sia disponibile
             if (!openScadInstance || typeof openScadInstance.renderToStl !== 'function') {
-                throw new Error("La funzione nativa 'renderToStl' non è pronta o non è presente nell'istanza.");
+                throw new Error("La funzione nativa 'renderToStl' non è pronta.");
             }
 
-            // Eseguiamo il rendering diretto passando la stringa di codice OpenSCAD
-            // La funzione restituisce direttamente i dati del file STL compilato (come stringa o array binario)
             const outputData = await openScadInstance.renderToStl(code);
             
             if (!outputData) {
                 throw new Error("Il motore grafico ha restituito un file vuoto.");
             }
             
-            // Impacchettiamo il file generato e avviamo il download sul browser
             const blob = new Blob([outputData], { type: "application/sla" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -140,7 +140,12 @@ difference() {
             statusElem.innerText = "STL scaricato con successo!";
         } catch (err) {
             statusElem.className = "error";
-            statusElem.innerText = "ERRORE GEOMETRICO: " + (err.message || err.toString());
+            // Se abbiamo catturato dei log reali da OpenSCAD, mostriamo quelli invece del numero di errore generico
+            if (openScadLogs.length > 0) {
+                statusElem.innerText = "ERRORE OPENSCAD: " + openScadLogs.join(" | ");
+            } else {
+                statusElem.innerText = "ERRORE GEOMETRICO: " + (err.message || err.toString());
+            }
         } finally {
             convertBtn.disabled = false;
         }
