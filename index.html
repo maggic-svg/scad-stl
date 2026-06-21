@@ -63,7 +63,6 @@ difference() {
     }
 
     let openScadInstance = null;
-    let emscriptenModuleConfig = {};
 
     async function init() {
         try {
@@ -89,26 +88,13 @@ difference() {
                 throw new Error("Nessuna funzione esportata nel file WASM.");
             }
 
-            statusElem.innerText = "Inizializzazione macchina virtuale WASM...";
+            statusElem.innerText = "Compilazione motore grafico...";
 
-            // Oggetto di configurazione che memorizzerà lo stato interno di Emscripten
-            emscriptenModuleConfig = { 
+            // Lanciamo il factory passandogli i parametri richiesti
+            openScadInstance = await openScadFactory({ 
                 noInitialRun: true,
                 locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
-            };
-
-            // Lanciamo l'inizializzazione del modulo geometrico
-            const result = await openScadFactory(emscriptenModuleConfig);
-            openScadInstance = result || emscriptenModuleConfig;
-
-            // TRUCCO: Se l'ambiente usa il vecchio sistema a promessa ritardata, attendiamo il caricamento totale
-            if (openScadInstance.ready && typeof openScadInstance.ready.then === 'function') {
-                statusElem.innerText = "Configurazione del File System virtuale...";
-                await openScadInstance.ready;
-            }
-            if (emscriptenModuleConfig.ready && typeof emscriptenModuleConfig.ready.then === 'function') {
-                await emscriptenModuleConfig.ready;
-            }
+            });
             
             statusElem.className = "success";
             statusElem.innerText = "Pronto! Inserisci il codice e converti.";
@@ -125,35 +111,24 @@ difference() {
         if(!code) return;
         convertBtn.disabled = true;
         statusElem.className = "";
-        statusElem.innerText = "Elaborazione solido 3D...";
+        statusElem.innerText = "Elaborazione solido 3D in corso...";
         await new Promise(r => setTimeout(r, 50));
         
         try {
-            // Recupero incrociato del File System (FS) e della funzione principale (callMain)
-            const FS = openScadInstance.FS || openScadInstance.fs || emscriptenModuleConfig.FS || emscriptenModuleConfig.fs;
-            const callMain = openScadInstance.callMain || emscriptenModuleConfig.callMain;
-
-            // Se non lo trova nemmeno così, estrae la lista delle chiavi per l'autodiagnosi istantanea
-            if (!FS || typeof FS.writeFile !== 'function') {
-                const instKeys = Object.keys(openScadInstance).join(', ') || 'vuoto';
-                const confKeys = Object.keys(emscriptenModuleConfig).join(', ') || 'vuoto';
-                throw new Error("FS non mappato. Elementi Istanza: [" + instKeys + "] | Elementi Config: [" + confKeys + "]");
+            // Verifichiamo che la funzione nativa estratta sia disponibile
+            if (!openScadInstance || typeof openScadInstance.renderToStl !== 'function') {
+                throw new Error("La funzione nativa 'renderToStl' non è pronta o non è presente nell'istanza.");
             }
 
-            // Scrittura del codice OpenSCAD nella sandbox del browser
-            FS.writeFile("input.scad", code);
+            // Eseguiamo il rendering diretto passando la stringa di codice OpenSCAD
+            // La funzione restituisce direttamente i dati del file STL compilato (come stringa o array binario)
+            const outputData = await openScadInstance.renderToStl(code);
             
-            // Esecuzione del compilatore geometrico
-            if (typeof callMain === 'function') {
-                callMain(["input.scad", "-o", "output.stl"]);
-            } else if (typeof openScadInstance === 'function') {
-                openScadInstance(["input.scad", "-o", "output.stl"]);
-            } else {
-                throw new Error("Funzione di compilazione (callMain) mancante.");
+            if (!outputData) {
+                throw new Error("Il motore grafico ha restituito un file vuoto.");
             }
             
-            // Lettura del binario STL generato e download automatico
-            const outputData = FS.readFile("output.stl");
+            // Impacchettiamo il file generato e avviamo il download sul browser
             const blob = new Blob([outputData], { type: "application/sla" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -165,7 +140,7 @@ difference() {
             statusElem.innerText = "STL scaricato con successo!";
         } catch (err) {
             statusElem.className = "error";
-            statusElem.innerText = "CRASH COMPILATORE: " + (err.message || err.toString());
+            statusElem.innerText = "ERRORE GEOMETRICO: " + (err.message || err.toString());
         } finally {
             convertBtn.disabled = false;
         }
