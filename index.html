@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenSCAD to STL Studio</title>
+    <title>OpenSCAD2 to STL Studio</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <style>
@@ -21,12 +21,6 @@
         .error { background: #451a1a !important; color: #fca5a5 !important; border-color: #7f1d1d !important; }
         .success { background: #064e3b !important; color: #a7f3d0 !important; border-color: #065f46 !important; }
     </style>
-
-    <script>
-        window.module = { exports: {} };
-    </script>
-    
-    <script src="https://unpkg.com/openscad-wasm@0.0.4/openscad.js"></script>
 </head>
 <body>
 
@@ -51,13 +45,16 @@ difference() {
         const status = document.getElementById('status');
         if(status) {
             status.className = "error";
-            status.innerText = "BLOCCO BROWSER: " + message + " (Linea: " + lineno + ")";
+            status.innerText = "BLOCCO SCRIPT: " + message + " (Linea: " + lineno + ")";
         }
         return false;
     };
 </script>
 
-<script>
+<script type="module">
+    // Importiamo l'intero pacchetto come oggetto globale temporaneo
+    import * as OScadModule from "https://unpkg.com/openscad-wasm@0.0.4/openscad.js";
+
     const scadCodeElem = document.getElementById('scadCode');
     const convertBtn = document.getElementById('convertBtn');
     const statusElem = document.getElementById('status');
@@ -70,33 +67,36 @@ difference() {
 
     async function init() {
         try {
-            statusElem.innerText = "Intercettazione motore geometrico...";
+            statusElem.innerText = "Scansione delle funzioni esportate...";
             
-            // Cerchiamo la funzione inizializzatrice ovunque lo script possa averla nascosta
             let openScadFactory = null;
-            
-            if (window.module && window.module.exports) {
-                if (typeof window.module.exports === 'function') {
-                    openScadFactory = window.module.exports;
-                } else if (window.module.exports.default && typeof window.module.exports.default === 'function') {
-                    openScadFactory = window.module.exports.default;
-                } else if (window.module.exports.OpenSCAD && typeof window.module.exports.OpenSCAD === 'function') {
-                    openScadFactory = window.module.exports.OpenSCAD;
+            const keys = Object.keys(OScadModule);
+
+            // 1. Controllo i nomi più probabili
+            if (typeof OScadModule.OpenSCAD === 'function') {
+                openScadFactory = OScadModule.OpenSCAD;
+            } else if (typeof OScadModule.openscad === 'function') {
+                openScadFactory = OScadModule.openscad;
+            } else if (typeof OScadModule.default === 'function') {
+                openScadFactory = OScadModule.default;
+            } else {
+                // 2. Fallback dinamico: estrai la prima cosa che sia una funzione
+                for (let key of keys) {
+                    if (typeof OScadModule[key] === 'function') {
+                        openScadFactory = OScadModule[key];
+                        break;
+                    }
                 }
             }
-            
-            // Fallback storici di Emscripten nel caso l'inganno non fosse servito
+
+            // Se fallisce la ricerca automatica, sputa fuori le chiavi trovate per l'ispezione
             if (!openScadFactory) {
-                openScadFactory = window.OpenSCAD || window.openscad || window.Module;
+                throw new Error("Nessuna funzione esportata. Elementi trovati nel file: [" + keys.join(', ') + "]");
             }
 
-            // Se non lo trovi nemmeno ora, lancia un errore descrittivo
-            if (typeof openScadFactory !== 'function') {
-                throw new Error("Impossibile estrarre la funzione OpenSCAD dagli elementi globali.");
-            }
+            statusElem.innerText = "Funzione trovata! Compilazione WebAssembly...";
 
-            statusElem.innerText = "Compilazione WebAssembly in corso (Richiede pochi secondi)...";
-
+            // Inizializzazione del motore geometrico
             openScadInstance = await openScadFactory({ 
                 noInitialRun: true,
                 locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
@@ -108,7 +108,7 @@ difference() {
             convertBtn.disabled = false;
         } catch (e) {
             statusElem.className = "error";
-            statusElem.innerText = "ERRORE CONNESSI: " + e.message;
+            statusElem.innerText = "ERRORE AVVIO: " + e.message;
         }
     }
 
@@ -139,8 +139,8 @@ difference() {
         }
     });
 
-    // Inizia la configurazione quando la pagina è pronta
-    window.addEventListener('load', init);
+    // Avvia quando la pagina ha caricato tutto il modulo
+    init();
 </script>
 
 </body>
