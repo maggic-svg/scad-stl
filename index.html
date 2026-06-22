@@ -63,7 +63,7 @@ difference() {
     }
 
     let openScadInstance = null;
-    let openScadLogs = []; // Array per catturare i messaggi reali di OpenSCAD
+    let openScadLogs = [];
 
     async function init() {
         try {
@@ -91,10 +91,79 @@ difference() {
 
             statusElem.innerText = "Compilazione motore grafico...";
 
-            // Intercettiamo print e printErr di Emscripten per salvare i log reali di OpenSCAD
             openScadInstance = await openScadFactory({ 
                 noInitialRun: true,
-                print: (text) => {  openScadLogs.push(text); },
+                print: (text) => { openScadLogs.push(text); },
+                printErr: (text) => { openScadLogs.push(text); },
+                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
+            });
+            
+            statusElem.className = "success";
+            statusElem.innerText = "Pronto! Inserisci il codice e converti.";
+            convertBtn.innerText = "Genera e Scarica STL";
+            convertBtn.disabled = false;
+        } catch (e) {
+            statusElem.className = "error";
+            statusElem.innerText = "ERRORE AVVIO: " + e.message;
+        }
+    }
+
+    convertBtn.addEventListener('click', async () => {
+        let code = scadCodeElem.value.trim();
+        if(!code) return;
+        
+        convertBtn.disabled = true;
+        statusElem.className = "";
+        statusElem.innerText = "Elaborazione solido 3D in corso...";
+        openScadLogs = []; 
+        await new Promise(r => setTimeout(r, 50));
+        
+        try {
+            if (!openScadInstance || typeof openScadInstance.renderToStl !== 'function') {
+                throw new Error("La funzione nativa 'renderToStl' non è pronta.");
+            }
+
+            // PULIZIA STRINGA: Rimuoviamo i commenti a doppia barra per sicurezza
+            code = code.replace(/\/\/.*$/gm, '');
+            
+            // Uniamo tutto in una riga lineare continua eliminando i ritorni a capo 
+            // che fanno andare in crash il parser di questa versione WASM
+            const cleanCode = code.replace(/\s+/g, ' ').trim();
+
+            // Inviamo il codice pulito alla funzione nativa
+            const outputData = await openScadInstance.renderToStl(cleanCode);
+            
+            if (!outputData || outputData.length === 0) {
+                throw new Error("Il motore grafico ha restituito un file vuoto.");
+            }
+            
+            const blob = new Blob([outputData], { type: "application/sla" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "modello_3d.stl";
+            a.click();
+            
+            statusElem.className = "success";
+            statusElem.innerText = "STL scaricato con successo!";
+        } catch (err) {
+            statusElem.className = "error";
+            let msgErrore = err.message || err.toString();
+            if (openScadLogs.length > 0) {
+                msgErrore += "\n\nDettagli compilatore:\n" + openScadLogs.slice(-3).join(" | ");
+            }
+            statusElem.innerText = "ERRORE: " + msgErrore;
+        } finally {
+            convertBtn.disabled = false;
+        }
+    });
+
+    init();
+</script>
+
+</body>
+</html>
+print: (text) => {  openScadLogs.push(text); },
                 printErr: (text) => { openScadLogs.push(text); },
                 locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
             });
