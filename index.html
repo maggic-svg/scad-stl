@@ -52,7 +52,8 @@ difference() {
 </script>
 
 <script type="module">
-    import * as OScadModule from "https://unpkg.com/openscad-wasm@0.0.4/openscad.js";
+    // Cambiamo approccio puntando alla build stabile precedente che gestiva le stringhe in modo diverso
+    import openSCAD from "https://unpkg.com/openscad-wasm@0.0.3/openscad.js";
 
     const scadCodeElem = document.getElementById('scadCode');
     const convertBtn = document.getElementById('convertBtn');
@@ -67,105 +68,14 @@ difference() {
 
     async function init() {
         try {
-            let openScadFactory = null;
-            const keys = Object.keys(OScadModule);
-
-            if (typeof OScadModule.OpenSCAD === 'function') {
-                openScadFactory = OScadModule.OpenSCAD;
-            } else if (typeof OScadModule.openscad === 'function') {
-                openScadFactory = OScadModule.openscad;
-            } else if (typeof OScadModule.default === 'function') {
-                openScadFactory = OScadModule.default;
-            } else {
-                for (let key of keys) {
-                    if (typeof OScadModule[key] === 'function') {
-                        openScadFactory = OScadModule[key];
-                        break;
-                    }
-                }
-            }
-
-            if (!openScadFactory) {
-                throw new Error("Nessuna funzione esportata nel file WASM.");
-            }
-
             statusElem.innerText = "Compilazione motore grafico...";
 
-            openScadInstance = await openScadFactory({ 
+            // Inizializzazione diretta secondo lo standard v0.0.3
+            openScadInstance = await openSCAD({
                 noInitialRun: true,
                 print: (text) => { openScadLogs.push(text); },
                 printErr: (text) => { openScadLogs.push(text); },
-                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
-            });
-            
-            statusElem.className = "success";
-            statusElem.innerText = "Pronto! Inserisci il codice e converti.";
-            convertBtn.innerText = "Genera e Scarica STL";
-            convertBtn.disabled = false;
-        } catch (e) {
-            statusElem.className = "error";
-            statusElem.innerText = "ERRORE AVVIO: " + e.message;
-        }
-    }
-
-    convertBtn.addEventListener('click', async () => {
-        let code = scadCodeElem.value.trim();
-        if(!code) return;
-        
-        convertBtn.disabled = true;
-        statusElem.className = "";
-        statusElem.innerText = "Elaborazione solido 3D in corso...";
-        openScadLogs = []; 
-        await new Promise(r => setTimeout(r, 50));
-        
-        try {
-            if (!openScadInstance || typeof openScadInstance.renderToStl !== 'function') {
-                throw new Error("La funzione nativa 'renderToStl' non è pronta.");
-            }
-
-            // PULIZIA STRINGA: Rimuoviamo i commenti a doppia barra per sicurezza
-            code = code.replace(/\/\/.*$/gm, '');
-            
-            // Uniamo tutto in una riga lineare continua eliminando i ritorni a capo 
-            // che fanno andare in crash il parser di questa versione WASM
-            const cleanCode = code.replace(/\s+/g, ' ').trim();
-
-            // Inviamo il codice pulito alla funzione nativa
-            const outputData = await openScadInstance.renderToStl(cleanCode);
-            
-            if (!outputData || outputData.length === 0) {
-                throw new Error("Il motore grafico ha restituito un file vuoto.");
-            }
-            
-            const blob = new Blob([outputData], { type: "application/sla" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "modello_3d.stl";
-            a.click();
-            
-            statusElem.className = "success";
-            statusElem.innerText = "STL scaricato con successo!";
-        } catch (err) {
-            statusElem.className = "error";
-            let msgErrore = err.message || err.toString();
-            if (openScadLogs.length > 0) {
-                msgErrore += "\n\nDettagli compilatore:\n" + openScadLogs.slice(-3).join(" | ");
-            }
-            statusElem.innerText = "ERRORE: " + msgErrore;
-        } finally {
-            convertBtn.disabled = false;
-        }
-    });
-
-    init();
-</script>
-
-</body>
-</html>
-print: (text) => {  openScadLogs.push(text); },
-                printErr: (text) => { openScadLogs.push(text); },
-                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
+                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.3/${path}`
             });
             
             statusElem.className = "success";
@@ -181,10 +91,11 @@ print: (text) => {  openScadLogs.push(text); },
     convertBtn.addEventListener('click', async () => {
         const code = scadCodeElem.value.trim();
         if(!code) return;
+        
         convertBtn.disabled = true;
         statusElem.className = "";
         statusElem.innerText = "Elaborazione solido 3D in corso...";
-        openScadLogs = []; // Svuota i log del vecchio tentativo
+        openScadLogs = []; 
         await new Promise(r => setTimeout(r, 50));
         
         try {
@@ -192,29 +103,8 @@ print: (text) => {  openScadLogs.push(text); },
                 throw new Error("Il motore grafico non è pronto.");
             }
 
-            // CORREZIONE FONDAMENTALE: Scriviamo il codice in un file virtuale (FS) 
-            // per bypassare il crash del passaggio diretto della stringa
-            if (openScadInstance.FS && typeof openScadInstance.FS.writeFile === 'function') {
-                openScadInstance.FS.writeFile("input.scad", code);
-            } else {
-                throw new Error("File System virtuale non pronto.");
-            }
-
-            let outputData = null;
-            
-            // Tentiamo prima con renderToStl passando il file finto
-            if (typeof openScadInstance.renderToStl === 'function') {
-                outputData = await openScadInstance.renderToStl("input.scad");
-            } 
-            // Se fallisce, usiamo l'interfaccia CLI nativa eseguendo i comandi standard di OpenSCAD
-            else if (typeof openScadInstance.callMain === 'function') {
-                await openScadInstance.callMain(["-o", "output.stl", "input.scad"]);
-                if (openScadInstance.FS && typeof openScadInstance.FS.readFile === 'function') {
-                    outputData = openScadInstance.FS.readFile("output.stl");
-                }
-            } else {
-                throw new Error("Nessun metodo di rendering valido trovato nella libreria.");
-            }
+            // Proviamo l'esecuzione diretta passandogli il codice nativo così com'è
+            const outputData = await openScadInstance.renderToStl(code);
             
             if (!outputData || outputData.length === 0) {
                 throw new Error("Il motore grafico ha restituito un file vuoto.");
