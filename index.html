@@ -65,38 +65,35 @@ difference() {
     let openScadInstance = null;
     let openScadLogs = [];
 
-    async function init() {
-        try {
-            let openScadFactory = null;
+    // Funzione centralizzata per creare un'istanza pulita del motore grafico
+    async function creareMotoreGrafico() {
+        let openScadFactory = OScadModule.OpenSCAD || OScadModule.openscad || OScadModule.default;
+        if (!openScadFactory) {
             const keys = Object.keys(OScadModule);
-
-            if (typeof OScadModule.OpenSCAD === 'function') {
-                openScadFactory = OScadModule.OpenSCAD;
-            } else if (typeof OScadModule.openscad === 'function') {
-                openScadFactory = OScadModule.openscad;
-            } else if (typeof OScadModule.default === 'function') {
-                openScadFactory = OScadModule.default;
-            } else {
-                for (let key of keys) {
-                    if (typeof OScadModule[key] === 'function') {
-                        openScadFactory = OScadModule[key];
-                        break;
-                    }
+            for (let key of keys) {
+                if (typeof OScadModule[key] === 'function') {
+                    openScadFactory = OScadModule[key];
+                    break;
                 }
             }
+        }
+        if (!openScadFactory) {
+            throw new Error("Nessuna funzione esportata nel file WASM.");
+        }
+        
+        return await openScadFactory({ 
+            noInitialRun: true,
+            print: (text) => { openScadLogs.push(text); },
+            printErr: (text) => { openScadLogs.push(text); },
+            locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
+        });
+    }
 
-            if (!openScadFactory) {
-                throw new Error("Nessuna funzione esportata nel file WASM.");
-            }
-
+    // Primo avvio della pagina
+    async function init() {
+        try {
             statusElem.innerText = "Compilazione motore grafico...";
-
-            openScadInstance = await openScadFactory({ 
-                noInitialRun: true,
-                print: (text) => { openScadLogs.push(text); },
-                printErr: (text) => { openScadLogs.push(text); },
-                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
-            });
+            openScadInstance = await creareMotoreGrafico();
             
             statusElem.className = "success";
             statusElem.innerText = "Pronto! Inserisci il codice e converti.";
@@ -114,23 +111,24 @@ difference() {
         
         convertBtn.disabled = true;
         statusElem.className = "";
-        statusElem.innerText = "Elaborazione solido 3D in corso...";
+        statusElem.innerText = "Svuotamento memoria e calcolo 3D...";
         openScadLogs = []; 
         await new Promise(r => setTimeout(r, 50));
         
         try {
+            // RIGENERAZIONE ISTANZA: Azzeriamo la vecchia memoria WebAssembly prima del calcolo
+            openScadInstance = null; 
+            openScadInstance = await creareMotoreGrafico();
+
             if (!openScadInstance || typeof openScadInstance.renderToStl !== 'function') {
-                throw new Error("La funzione nativa 'renderToStl' non è pronta.");
+                throw new Error("Il motore grafico non si è rigenerato correttamente.");
             }
 
-            // PULIZIA STRINGA: Rimuoviamo i commenti a doppia barra per sicurezza
+            // Pulizia del codice da commenti e ritorni a capo per stabilità su Android
             code = code.replace(/\/\/.*$/gm, '');
-            
-            // Uniamo tutto in una riga lineare continua eliminando i ritorni a capo 
-            // che fanno andare in crash il parser di questa versione WASM
             const cleanCode = code.replace(/\s+/g, ' ').trim();
 
-            // Inviamo il codice pulito alla funzione nativa
+            // Calcolo effettivo della mesh 3D
             const outputData = await openScadInstance.renderToStl(cleanCode);
             
             if (!outputData || outputData.length === 0) {
@@ -145,7 +143,7 @@ difference() {
             a.click();
             
             statusElem.className = "success";
-            statusElem.innerText = "STL scaricato con successo!";
+            statusElem.innerText = "STL scaricato! Memoria azzerata per il prossimo pezzo.";
         } catch (err) {
             statusElem.className = "error";
             let msgErrore = err.message || err.toString();
