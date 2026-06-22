@@ -52,8 +52,7 @@ difference() {
 </script>
 
 <script type="module">
-    // Cambiamo approccio puntando alla build stabile precedente che gestiva le stringhe in modo diverso
-    import openSCAD from "https://unpkg.com/openscad-wasm@0.0.3/openscad.js";
+    import * as OScadModule from "https://unpkg.com/openscad-wasm@0.0.4/openscad.js";
 
     const scadCodeElem = document.getElementById('scadCode');
     const convertBtn = document.getElementById('convertBtn');
@@ -68,14 +67,35 @@ difference() {
 
     async function init() {
         try {
+            let openScadFactory = null;
+            const keys = Object.keys(OScadModule);
+
+            if (typeof OScadModule.OpenSCAD === 'function') {
+                openScadFactory = OScadModule.OpenSCAD;
+            } else if (typeof OScadModule.openscad === 'function') {
+                openScadFactory = OScadModule.openscad;
+            } else if (typeof OScadModule.default === 'function') {
+                openScadFactory = OScadModule.default;
+            } else {
+                for (let key of keys) {
+                    if (typeof OScadModule[key] === 'function') {
+                        openScadFactory = OScadModule[key];
+                        break;
+                    }
+                }
+            }
+
+            if (!openScadFactory) {
+                throw new Error("Nessuna funzione esportata nel file WASM.");
+            }
+
             statusElem.innerText = "Compilazione motore grafico...";
 
-            // Inizializzazione diretta secondo lo standard v0.0.3
-            openScadInstance = await openSCAD({
+            openScadInstance = await openScadFactory({ 
                 noInitialRun: true,
                 print: (text) => { openScadLogs.push(text); },
                 printErr: (text) => { openScadLogs.push(text); },
-                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.3/${path}`
+                locateFile: (path) => `https://unpkg.com/openscad-wasm@0.0.4/${path}`
             });
             
             statusElem.className = "success";
@@ -89,7 +109,7 @@ difference() {
     }
 
     convertBtn.addEventListener('click', async () => {
-        const code = scadCodeElem.value.trim();
+        let code = scadCodeElem.value.trim();
         if(!code) return;
         
         convertBtn.disabled = true;
@@ -99,12 +119,19 @@ difference() {
         await new Promise(r => setTimeout(r, 50));
         
         try {
-            if (!openScadInstance) {
-                throw new Error("Il motore grafico non è pronto.");
+            if (!openScadInstance || typeof openScadInstance.renderToStl !== 'function') {
+                throw new Error("La funzione nativa 'renderToStl' non è pronta.");
             }
 
-            // Proviamo l'esecuzione diretta passandogli il codice nativo così com'è
-            const outputData = await openScadInstance.renderToStl(code);
+            // PULIZIA STRINGA: Rimuoviamo i commenti a doppia barra per sicurezza
+            code = code.replace(/\/\/.*$/gm, '');
+            
+            // Uniamo tutto in una riga lineare continua eliminando i ritorni a capo 
+            // che fanno andare in crash il parser di questa versione WASM
+            const cleanCode = code.replace(/\s+/g, ' ').trim();
+
+            // Inviamo il codice pulito alla funzione nativa
+            const outputData = await openScadInstance.renderToStl(cleanCode);
             
             if (!outputData || outputData.length === 0) {
                 throw new Error("Il motore grafico ha restituito un file vuoto.");
