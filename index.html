@@ -104,7 +104,7 @@ difference() {
     let openScadLogs = [];
     let ultimoBlobGenerato = null;
 
-    // VARIABILI PER IL MOTORE GRAPHICO THREE.JS
+    // VARIABILI PER IL MOTORE GRAFICO THREE.JS
     let scene, camera, renderer, controls, currentMesh;
 
     // Inizializza la scena 3D vuota all'avvio della pagina
@@ -126,7 +126,7 @@ difference() {
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
 
-        // Luci nella scena per vedere le ombre del solido
+        // Luci nella scena per definire i volumi e i dettagli del solido
         const ambientLight = new THREE.AmbientLight(0x666666);
         scene.add(ambientLight);
 
@@ -158,39 +158,43 @@ difference() {
 
     // Carica l'array binario dell'STL nel visualizzatore
     function caricaStlNelVisualizzatore(buffer) {
-        if (currentMesh) scene.remove(currentMesh);
+        try {
+            if (currentMesh) scene.remove(currentMesh);
 
-        const loader = new THREE.STLLoader();
-        const geometry = loader.parse(buffer);
-        
-        // Materiale plastico verde semilucido tipo filamento PLA
-        const material = new THREE.MeshStandardMaterial({ 
-            color: 0x10b981, 
-            roughness: 0.4,
-            metalness: 0.2
-        });
-        
-        currentMesh = new THREE.Mesh(geometry, material);
-        
-        // Centra l'oggetto calcolato al centro del riquadro
-        geometry.computeBoundingBox();
-        const boundingBox = geometry.boundingBox;
-        const center = new THREE.Vector3();
-        boundingBox.getCenter(center);
-        currentMesh.position.sub(center);
+            const loader = new THREE.STLLoader();
+            const geometry = loader.parse(buffer);
+            
+            // Materiale plastico verde semilucido tipo filamento PLA
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0x10b981, 
+                roughness: 0.4,
+                metalness: 0.2
+            });
+            
+            currentMesh = new THREE.Mesh(geometry, material);
+            
+            // Centra l'oggetto calcolato al centro del riquadro
+            geometry.computeBoundingBox();
+            const boundingBox = geometry.boundingBox;
+            const center = new THREE.Vector3();
+            boundingBox.getCenter(center);
+            currentMesh.position.sub(center);
 
-        scene.add(currentMesh);
+            scene.add(currentMesh);
 
-        // Regola la telecamera in base alla grandezza del pezzo
-        const size = new THREE.Vector3();
-        boundingBox.getSize(size);
-        const maxDim = Math.max(size.x, size.y, size.z);
-        camera.position.set(maxDim * 1.5, maxDim * 1.5, maxDim * 1.5);
-        camera.lookAt(0, 0, 0);
-        if (controls) controls.target.set(0,0,0);
+            // Regola lo zoom della telecamera in base alla reale grandezza del pezzo
+            const size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            camera.position.set(maxDim * 1.6, maxDim * 1.6, maxDim * 1.6);
+            camera.lookAt(0, 0, 0);
+            if (controls) controls.target.set(0,0,0);
+        } catch (errVisualizzatore) {
+            throw new Error("Errore nel disegno 3D: " + errVisualizzatore.message);
+        }
     }
 
-    // Generazione pulita del motore WebAssembly
+    // Generazione pulita e ricarica controllata del motore WebAssembly
     async function creareMotoreGrafico() {
         let openScadFactory = OScadModule.OpenSCAD || OScadModule.openscad || OScadModule.default;
         if (!openScadFactory) {
@@ -226,7 +230,7 @@ difference() {
         }
     }
 
-    // PULSANTE 1: CALCOLO E ANTEPRIMA VISIVA
+    // PULSANTE 1: CALCOLO GEOMETRICO ED ESTRAZIONE ANTEPRIMA VISIVA
     previewBtn.addEventListener('click', async () => {
         let code = scadCodeElem.value.trim();
         if(!code) return;
@@ -239,6 +243,7 @@ difference() {
         await new Promise(r => setTimeout(r, 50));
         
         try {
+            // Rigenerazione dell'istanza per pulire i residui WASM dai tentativi precedenti
             openScadInstance = null; 
             openScadInstance = await creareMotoreGrafico();
 
@@ -246,6 +251,7 @@ difference() {
                 throw new Error("Il motore grafico non si è rigenerato correttamente.");
             }
 
+            // Pulizia della stringa (no commenti, no ritorni a capo) per non mandare in crash mobile
             code = code.replace(/\/\/.*$/gm, '');
             const cleanCode = code.replace(/\s+/g, ' ').trim();
 
@@ -255,28 +261,36 @@ difference() {
                 throw new Error("Il modello ha restituito una geometria vuota.");
             }
             
-            // Inviamo i dati grezzi estratti dal WASM direttamente a Three.js
-            caricaStlNelVisualizzatore(outputData.buffer);
-            
-            // Conserviamo il blob in memoria pronto per essere scaricato se l'utente clicca il secondo tasto
+            // Creiamo il file Blob in memoria pronto per l'eventuale download successivo
             ultimoBlobGenerato = new Blob([outputData], { type: "application/sla" });
+            
+            // TAGLIO CORRETTO DELLA MEMORIA: Estraiamo l'ArrayBuffer lineare intatto per Three.js
+            let bufferPerViewer;
+            if (outputData && outputData.buffer instanceof ArrayBuffer) {
+                bufferPerViewer = outputData.buffer.slice(outputData.byteOffset, outputData.byteOffset + outputData.byteLength);
+            } else {
+                bufferPerViewer = outputData;
+            }
+
+            // Inviamo il flusso dati corretto a Three.js per disegnarlo
+            caricaStlNelVisualizzatore(bufferPerViewer);
             
             statusElem.className = "success";
             statusElem.innerText = "Anteprima caricata! Puoi muovere l'oggetto. Ora puoi scaricare l'STL.";
-            downloadBtn.disabled = false; // Sblocca il pulsante di download
+            downloadBtn.disabled = false; 
         } catch (err) {
             statusElem.className = "error";
             let msgErrore = err.message || err.toString();
             if (openScadLogs.length > 0) {
                 msgErrore += "\n\nDettagli compilatore:\n" + openScadLogs.slice(-3).join(" | ");
             }
-            statusElem.innerText = "ERRORE GEOMETRICO:\n" + msgErrore;
+            statusElem.innerText = "ERRORE:\n" + msgErrore;
         } finally {
             previewBtn.disabled = false;
         }
     });
 
-    // PULSANTE 2: DOWNLOAD DEL FILE SALVATO IN MEMORIA
+    // PULSANTE 2: SALVATAGGIO LOCALE DEL FILE STL GENERATO
     downloadBtn.addEventListener('click', () => {
         if (!ultimoBlobGenerato) return;
         
@@ -286,7 +300,6 @@ difference() {
         a.download = "modello_3d.stl";
         a.click();
         
-        // Pulizia dell'URL dopo il download
         setTimeout(() => URL.revokeObjectURL(url), 100);
     });
 
