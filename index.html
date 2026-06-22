@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -25,7 +26,14 @@
         header { text-align: center; margin-bottom: 20px; }
         header h1 { font-size: 1.5rem; margin-bottom: 4px; }
         header p { font-size: 0.85rem; color: var(--text-muted); }
-        textarea { width: 100%; height: 180px; background-color: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 14px; color: #38bdf8; font-family: monospace; font-size: 0.95rem; resize: none; outline: none; margin-top: 8px; }
+        
+        /* Contenitore per posizionare il pulsante incolla sopra la textarea */
+        .textarea-wrapper { position: relative; width: 100%; margin-top: 8px; }
+        textarea { width: 100%; height: 180px; background-color: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 14px; padding-top: 40px; color: #38bdf8; font-family: monospace; font-size: 0.95rem; resize: none; outline: none; display: block; }
+        
+        /* Stile del pulsante Incolla volante */
+        .paste-btn { position: absolute; top: 10px; right: 10px; background: #334155; color: #38bdf8; border: 1px solid #475569; padding: 6px 12px; font-size: 0.75rem; font-weight: bold; border-radius: 6px; cursor: pointer; min-width: auto; flex: none; z-index: 10; transition: all 0.2s; }
+        .paste-btn:hover { background: #475569; color: #f8fafc; }
         
         .btn-group { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
         button { flex: 1; min-width: 160px; color: #042f1a; border: none; padding: 15px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; transition: background-color 0.2s; }
@@ -42,7 +50,7 @@
         /* Area del Visualizzatore 3D */
         #viewer-container { width: 100%; height: 280px; background-color: #0b0f19; border-radius: 12px; margin-top: 15px; border: 1px solid var(--border); position: relative; overflow: hidden; }
         #canvas3d { width: 100%; height: 100%; display: block; }
-        .viewer-label { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; color: var(--text-muted); pointer-events: none; }
+        .viewer-label { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; color: var(--text-muted); pointer-events: none; z-index: 5; }
     </style>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -57,11 +65,14 @@
         <p>Rendering 3D locale e offline</p>
     </header>
 
-    <textarea id="scadCode">// Esempio cilindro forato
+    <div class="textarea-wrapper">
+        <button id="pasteCodeBtn" class="paste-btn">📋 Incolla</button>
+        <textarea id="scadCode">// Esempio cilindro forato
 difference() {
     cylinder(h=20, r=15, center=true, $fn=50);
     cylinder(h=22, r=8, center=true, $fn=50);
 }</textarea>
+    </div>
 
     <div class="btn-group">
         <button id="previewBtn" disabled>Inizializzazione...</button>
@@ -93,6 +104,7 @@ difference() {
     const scadCodeElem = document.getElementById('scadCode');
     const previewBtn = document.getElementById('previewBtn');
     const downloadBtn = document.getElementById('downloadBtn');
+    const pasteCodeBtn = document.getElementById('pasteCodeBtn');
     const statusElem = document.getElementById('status');
     const canvas3dContainer = document.getElementById('canvas3d');
 
@@ -230,6 +242,32 @@ difference() {
         }
     }
 
+    // LOGICA DEL TASTO INCOLLA E SOSTITUISCI AUTOMATICO
+    pasteCodeBtn.addEventListener('click', async () => {
+        try {
+            const testoAppunti = await navigator.clipboard.readText();
+            if (testoAppunti.trim() !== "") {
+                scadCodeElem.value = testoAppunti; 
+                
+                // Effetto feedback visivo sul tasto
+                const testoOriginale = pasteCodeBtn.innerText;
+                pasteCodeBtn.innerText = "✅ Incollato!";
+                pasteCodeBtn.style.borderColor = "#10b981";
+                pasteCodeBtn.style.color = "#10b981";
+                
+                setTimeout(() => {
+                    pasteCodeBtn.innerText = testoOriginale;
+                    pasteCodeBtn.style.borderColor = "#475569";
+                    pasteCodeBtn.style.color = "#38bdf8";
+                }, 1500);
+            } else {
+                alert("Gli appunti sono vuoti! Copia prima il codice OpenSCAD.");
+            }
+        } catch (errClipboard) {
+            alert("Per incollare, consenti l'accesso agli appunti quando richiesto dal browser.");
+        }
+    });
+
     // PULSANTE 1: CALCOLO GEOMETRICO ED ESTRAZIONE ANTEPRIMA VISIVA
     previewBtn.addEventListener('click', async () => {
         let code = scadCodeElem.value.trim();
@@ -251,7 +289,7 @@ difference() {
                 throw new Error("Il motore grafico non si è rigenerato correttamente.");
             }
 
-            // Pulizia della stringa (no commenti, no ritorni a capo) per non mandare in crash mobile
+            // Pulizia della stringa (no commenti, no ritorni a capo) per stabilità mobile
             code = code.replace(/\/\/.*$/gm, '');
             const cleanCode = code.replace(/\s+/g, ' ').trim();
 
@@ -264,7 +302,7 @@ difference() {
             // Creiamo il file Blob in memoria pronto per l'eventuale download successivo
             ultimoBlobGenerato = new Blob([outputData], { type: "application/sla" });
             
-            // TAGLIO CORRETTO DELLA MEMORIA: Estraiamo l'ArrayBuffer lineare intatto per Three.js
+            // TAGLIO DELLA MEMORIA: Estraiamo l'ArrayBuffer lineare intatto per Three.js
             let bufferPerViewer;
             if (outputData && outputData.buffer instanceof ArrayBuffer) {
                 bufferPerViewer = outputData.buffer.slice(outputData.byteOffset, outputData.byteOffset + outputData.byteLength);
