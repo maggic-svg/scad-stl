@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -27,11 +26,9 @@
         header h1 { font-size: 1.5rem; margin-bottom: 4px; }
         header p { font-size: 0.85rem; color: var(--text-muted); }
         
-        /* Contenitore per posizionare il pulsante incolla sopra la textarea */
         .textarea-wrapper { position: relative; width: 100%; margin-top: 8px; }
         textarea { width: 100%; height: 180px; background-color: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 14px; padding-top: 40px; color: #38bdf8; font-family: monospace; font-size: 0.95rem; resize: none; outline: none; display: block; }
         
-        /* Stile del pulsante Incolla volante */
         .paste-btn { position: absolute; top: 10px; right: 10px; background: #334155; color: #38bdf8; border: 1px solid #475569; padding: 6px 12px; font-size: 0.75rem; font-weight: bold; border-radius: 6px; cursor: pointer; min-width: auto; flex: none; z-index: 10; transition: all 0.2s; }
         .paste-btn:hover { background: #475569; color: #f8fafc; }
         
@@ -47,7 +44,6 @@
         .error { background: #451a1a !important; color: #fca5a5 !important; border-color: #7f1d1d !important; }
         .success { background: #064e3b !important; color: #a7f3d0 !important; border-color: #065f46 !important; }
         
-        /* Area del Visualizzatore 3D */
         #viewer-container { width: 100%; height: 280px; background-color: #0b0f19; border-radius: 12px; margin-top: 15px; border: 1px solid var(--border); position: relative; overflow: hidden; }
         #canvas3d { width: 100%; height: 100%; display: block; }
         .viewer-label { position: absolute; top: 8px; left: 8px; background: rgba(15, 23, 42, 0.7); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; color: var(--text-muted); pointer-events: none; z-index: 5; }
@@ -85,6 +81,12 @@ difference() {
         <span class="viewer-label">Anteprima 3D Interattiva</span>
         <div id="canvas3d"></div>
     </div>
+
+    <footer style="text-align: center; margin-top: 25px; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">
+        Sviluppato da <strong style="color: var(--text-main);">Francesco Maggio Elettrodomestici</strong> sotto licenza MIT.<br>
+        Basato sui motori open-source <a href="https://openscad.org/" target="_blank" style="color: var(--btn-download); text-decoration: none;">OpenSCAD</a> e <a href="https://threejs.org/" target="_blank" style="color: var(--btn-download); text-decoration: none;">Three.js</a>.<br>
+        <em>Il mantenimento dei crediti dell'autore è obbligatorio in caso di condivisione o redistribuzione.</em>
+    </footer>
 </div>
 
 <script>
@@ -116,10 +118,8 @@ difference() {
     let openScadLogs = [];
     let ultimoBlobGenerato = null;
 
-    // VARIABILI PER IL MOTORE GRAFICO THREE.JS
     let scene, camera, renderer, controls, currentMesh;
 
-    // Inizializza la scena 3D vuota all'avvio della pagina
     function init3DViewer() {
         const width = canvas3dContainer.clientWidth;
         const height = canvas3dContainer.clientHeight;
@@ -138,7 +138,6 @@ difference() {
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
 
-        // Luci nella scena per definire i volumi e i dettagli del solido
         const ambientLight = new THREE.AmbientLight(0x666666);
         scene.add(ambientLight);
 
@@ -168,7 +167,6 @@ difference() {
         if (renderer && scene && camera) renderer.render(scene, camera);
     }
 
-    // Carica l'array binario dell'STL nel visualizzatore
     function caricaStlNelVisualizzatore(buffer) {
         try {
             if (currentMesh) scene.remove(currentMesh);
@@ -176,7 +174,6 @@ difference() {
             const loader = new THREE.STLLoader();
             const geometry = loader.parse(buffer);
             
-            // Materiale plastico verde semilucido tipo filamento PLA
             const material = new THREE.MeshStandardMaterial({ 
                 color: 0x10b981, 
                 roughness: 0.4,
@@ -185,7 +182,6 @@ difference() {
             
             currentMesh = new THREE.Mesh(geometry, material);
             
-            // Centra l'oggetto calcolato al centro del riquadro
             geometry.computeBoundingBox();
             const boundingBox = geometry.boundingBox;
             const center = new THREE.Vector3();
@@ -194,7 +190,6 @@ difference() {
 
             scene.add(currentMesh);
 
-            // Regola lo zoom della telecamera in base alla reale grandezza del pezzo
             const size = new THREE.Vector3();
             boundingBox.getSize(size);
             const maxDim = Math.max(size.x, size.y, size.z);
@@ -206,7 +201,6 @@ difference() {
         }
     }
 
-    // Generazione pulita e ricarica controllata del motore WebAssembly
     async function creareMotoreGrafico() {
         let openScadFactory = OScadModule.OpenSCAD || OScadModule.openscad || OScadModule.default;
         if (!openScadFactory) {
@@ -242,14 +236,12 @@ difference() {
         }
     }
 
-    // LOGICA DEL TASTO INCOLLA E SOSTITUISCI AUTOMATICO
     pasteCodeBtn.addEventListener('click', async () => {
         try {
             const testoAppunti = await navigator.clipboard.readText();
             if (testoAppunti.trim() !== "") {
                 scadCodeElem.value = testoAppunti; 
                 
-                // Effetto feedback visivo sul tasto
                 const testoOriginale = pasteCodeBtn.innerText;
                 pasteCodeBtn.innerText = "✅ Incollato!";
                 pasteCodeBtn.style.borderColor = "#10b981";
@@ -268,7 +260,6 @@ difference() {
         }
     });
 
-    // PULSANTE 1: CALCOLO GEOMETRICO ED ESTRAZIONE ANTEPRIMA VISIVA
     previewBtn.addEventListener('click', async () => {
         let code = scadCodeElem.value.trim();
         if(!code) return;
@@ -281,7 +272,6 @@ difference() {
         await new Promise(r => setTimeout(r, 50));
         
         try {
-            // Rigenerazione dell'istanza per pulire i residui WASM dai tentativi precedenti
             openScadInstance = null; 
             openScadInstance = await creareMotoreGrafico();
 
@@ -289,7 +279,6 @@ difference() {
                 throw new Error("Il motore grafico non si è rigenerato correttamente.");
             }
 
-            // Pulizia della stringa (no commenti, no ritorni a capo) per stabilità mobile
             code = code.replace(/\/\/.*$/gm, '');
             const cleanCode = code.replace(/\s+/g, ' ').trim();
 
@@ -299,10 +288,8 @@ difference() {
                 throw new Error("Il modello ha restituito una geometria vuota.");
             }
             
-            // Creiamo il file Blob in memoria pronto per l'eventuale download successivo
             ultimoBlobGenerato = new Blob([outputData], { type: "application/sla" });
             
-            // TAGLIO DELLA MEMORIA: Estraiamo l'ArrayBuffer lineare intatto per Three.js
             let bufferPerViewer;
             if (outputData && outputData.buffer instanceof ArrayBuffer) {
                 bufferPerViewer = outputData.buffer.slice(outputData.byteOffset, outputData.byteOffset + outputData.byteLength);
@@ -310,7 +297,6 @@ difference() {
                 bufferPerViewer = outputData;
             }
 
-            // Inviamo il flusso dati corretto a Three.js per disegnarlo
             caricaStlNelVisualizzatore(bufferPerViewer);
             
             statusElem.className = "success";
@@ -328,7 +314,6 @@ difference() {
         }
     });
 
-    // PULSANTE 2: SALVATAGGIO LOCALE DEL FILE STL GENERATO
     downloadBtn.addEventListener('click', () => {
         if (!ultimoBlobGenerato) return;
         
