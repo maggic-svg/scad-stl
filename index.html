@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenSCAD ➔ STL Converter</title>
-    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <style>
         :root { 
@@ -64,9 +63,7 @@
             border-radius: 10px; 
             cursor: pointer; 
             margin-top: 15px; 
-            transition: background-color 0.2s;
         }
-        button:hover:not(:disabled) { background-color: var(--accent-hover); }
         button:disabled { background-color: var(--border); color: var(--text-muted); cursor: not-allowed; }
         #status { 
             margin-top: 15px; 
@@ -83,6 +80,8 @@
         .error { background: #451a1a !important; color: #fca5a5 !important; border-color: #7f1d1d !important; }
         .success { background: #064e3b !important; color: #a7f3d0 !important; border-color: #065f46 !important; }
     </style>
+
+    <script src="https://unpkg.com/openscad-wasm@0.0.4/openscad.js"></script>
 </head>
 <body>
 
@@ -92,4 +91,12 @@
         <p>Rendering 3D locale e offline</p>
     </header>
 
-    <textarea
+    <textarea id="scadCode">// Esempio cilindro forato
+difference() {
+    cylinder(h=20, r=15, center=true, $fn=50);
+    cylinder(h=22, r=8, center=true, $fn=50);
+}</textarea>
+
+    <button id="convertBtn" disabled>Inizializzazione...</button>
+    <div id="status">Avvio download del motore geometrico...</div>
+</div>
