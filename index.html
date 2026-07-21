@@ -220,14 +220,28 @@ difference() {
         });
     }
 
+    function caricaTestoCondiviso() {
+        const params = new URLSearchParams(window.location.search);
+        const testoCondiviso = params.get('text') || params.get('url');
+        if (testoCondiviso && testoCondiviso.trim() !== "") {
+            scadCodeElem.value = testoCondiviso;
+            history.replaceState(null, "", window.location.pathname);
+            return true;
+        }
+        return false;
+    }
+
     async function init() {
         try {
             init3DViewer();
+            const testoCondivisoCaricato = caricaTestoCondiviso();
             statusElem.innerText = "Compilazione motore grafico...";
             openScadInstance = await creareMotoreGrafico();
-            
+
             statusElem.className = "success";
-            statusElem.innerText = "Pronto! Inserisci il codice e premi Anteprima.";
+            statusElem.innerText = testoCondivisoCaricato
+                ? "Codice condiviso caricato! Premi Anteprima."
+                : "Pronto! Inserisci il codice e premi Anteprima.";
             previewBtn.innerText = "Vedi Anteprima 3D";
             previewBtn.disabled = false;
         } catch (e) {
